@@ -1,0 +1,89 @@
+---
+title: "Generation of logistic predictor"
+author: "Paul Deveau"
+date: "`r Sys.Date()`"
+output: 
+html_document:
+  highlight: tango
+  theme: cosmo
+self_contained: no
+fig_width: 7
+fig_height: 7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(123)
+#library(ggplot2)
+rows = 10**4 
+```
+
+# Aim
+
+Test the skills of the candidate to extract relevant features, and see if he can predict using a logistic model.
+
+# Data Generation
+
+We are going to create a data frame of 10 columns, and 1,000 lines.
+Y is the (binary) target generated from e.
+a is a equiprobable sampling from 1 to 10.
+b to d are gaussian distributions with parameters mean = 0 or 1, sd=1 or 2
+e is a uniform sampling of $[0;1]$
+f to h are Poisson distribution, binomial distribution and negative binomial distribution unrelated to e and Y.
+
+```{r Gen}
+e<-runif(n = rows, min = 0, max = 1)
+Y<- sapply(X = e,function(z) rbinom(n = 1,size = 1,prob = 1/(1+exp(-10*(0.5 -z)))))
+a<-sample(x = 1:10,replace = TRUE,size = rows)
+b<-rnorm(n = rows,mean = 0,sd = 1)
+c<-rnorm(n = rows,mean = 1,sd = 2)
+d<-rnorm(n = rows,mean = 0,sd = 2)
+f<-rpois(n = rows, lambda = 5)
+g<-rbinom(n = rows, size = 5,prob = 0.3)
+h<-rnbinom(n = rows, size = 5, prob = 0.3)
+
+df<-data.frame(a,b,c,d,e,f,g,h,Y)
+#colnames(df)<-c(letters[1:(ncol(df)-1)],"Y")
+print(head(df))
+```
+
+Then we check that there is no correlation between the columns except for e and Y:
+```{r check}
+cor(df)[,"Y"]
+  
+
+```
+
+As expected, there is almost no correlation except for e. We can now save the data.
+
+```{r datasave}
+write.table(x = df, file = "dataset1.tsv",col.names = TRUE, row.names = FALSE,sep ="\t")
+
+```
+
+Then we look at the coefficient of the regression:
+
+```{r reg}
+logi<-glm(formula = Y ~ e, family = "binomial",data = df)
+
+print(logi)
+```
+
+Now we can plot the data:
+
+```{r plot}
+sam<-sample(x = 1:10**4,size = 500)
+plot(x = e,y=Y)
+curve(predict(logi,data.frame(e=x),type="resp"),add=TRUE)
+
+```
+
+Finally we predict on the following points (only the value of e is used of course):
+1. (3,0.8,-2,3, e = 0.6, 4,2,8)
+2. (4,0.3,2,-3, e = 0.1, 1,4,3)
+
+```{r pred}
+preds<-predict.glm(logi, newdata= data.frame(e=c(0.6,0.1)),type = "response")
+```
+
+We can now conclude that for 1. we have a probability of `r preds[1]` of obtaining a 1, and `r preds[2]` for 2. 

@@ -1,0 +1,61 @@
+---
+title: "Dimension reduction"
+author: "Paul Deveau"
+date: "`r Sys.Date()`"
+output: 
+html_document:
+  highlight: tango
+  theme: cosmo
+self_contained: no
+fig_width: 7
+fig_height: 7
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(123)
+rows = 5*10**4 
+library(ggplot2)
+library(cowplot)
+library(MASS)
+library(reshape2)
+```
+
+This time, we'll look at dimensionality reduction. We create two gaussians, and we will push into 5 dimensions with a matrix with non zero det.
+
+```{r predataset}
+XY<-mvrnorm(n = rows, mu = c(25,5),Sigma = matrix(c(9,5,2,25),ncol = 2,byrow = TRUE) , tol = 1e-6, empirical = FALSE, EISPACK = FALSE)
+r<-runif(25)
+M<-matrix(r,nrow = 5, ncol = 5)
+M<-M/det(M)
+
+print(M)
+```
+
+
+Now we will create a dataset, we label everything that has x< 25 as 0, and the rest as 1.
+
+```{r dataset}
+df<-matrix(nrow = rows,ncol = 5)
+for(i in 1:rows){
+   df[i,]<-c(M %*% c(XY[i,1],XY[i,2],0,0,0))
+}
+df<-cbind(df, as.numeric(XY[,1]>=25))
+colnames(df)<-c(letters[1:5],"target")
+write.table(x = df, file = "dataset3.csv",col.names = TRUE, row.names = FALSE,sep=",")
+
+```
+
+Now we will plot the PCA:
+
+```{r plots}
+PCA<-prcomp(df[,1:5])
+plot(PCA)
+## We keep only PC1 / PC2
+ggdf<-data.frame(x = PCA$x[,"PC1"], y= PCA$x[,"PC2"], color = as.character(df[,"target"]))
+ ggplot(data=ggdf) +
+   geom_point(aes(x=x, y=y,color=color),alpha = 0.15)+
+   scale_color_discrete("target")
+```
+
+
+We can check that except for PC1/PC2, all values are essentially 0. We also see that there is a hyperplan separating 0 and 1 targets, so a SVM with linear kernel would work pretty well. (A tree also, if you find the correct rotation...)
